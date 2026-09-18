@@ -9,168 +9,26 @@ from app.services.transaction_services import (
     get_latest_transaction,
     get_merchant_summary,
     get_monthly_summary,
-    summarize_transactions_for_last_month,
-    get_transaction_type_summary
+    summarize_all_transactions,
+    get_transaction_type_summary,
+    get_recent_transactions
+)
+from app.helpers.telegram_helpers import (
+    format_needs_clarification,
+    format_welcome,
+    format_monthly_summary,
+    format_category_summary,
+    format_merchant_summary,
+    format_recent_transaction,
+    format_transaction_added,
+    format_no_transactions,
+    format_unknown_command,
+    format_could_not_understand,
+    format_error,
+    format_recent_transactions
 )
 
 logger = logging.getLogger(__name__)
-
-DIVIDER = "─" * 24
-MONTH_NAMES = [
-    "", "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-]
-
-
-# ----------------------------------------------------------------------
-# Formatting helpers
-# ----------------------------------------------------------------------
-
-def _wrap(title: str, body: str, emoji: str = "") -> str:
-    """Standard message shell: emoji title, divider, body."""
-    header = f"{emoji} <b>{title}</b>".strip()
-    return f"{header}\n{DIVIDER}\n{body}"
-
-# Formatter for grouped rows, used in summaries
-def _format_grouped_rows(rows) -> tuple[str, float, float]:
-    """
-    Shared renderer for rows shaped like (category_or_group, txn_type, amount).
-    Returns (body_text, total_income, total_expense).
-    """
-    grouped: dict[str, list[tuple[str, float]]] = {}
-    total_income = 0.0
-    total_expense = 0.0
-
-    for group, txn_type, amount in rows:
-        grouped.setdefault(group, []).append((txn_type, amount))
-        if txn_type.lower() == "income":
-            total_income += float(amount)
-        else:
-            total_expense += float(amount)
-
-    lines = []
-    for group, entries in grouped.items():
-        lines.append(f"<b>{group}</b>")
-        for txn_type, amount in entries:
-            icon = "🟢" if txn_type.lower() == "income" else "🔴"
-            lines.append(f"  {icon} {txn_type}: ₹{amount:,.2f}")
-
-    return "\n".join(lines), total_income, total_expense
-
-# Formatter for welcome message
-def format_welcome() -> str:
-    body = (
-        "Track your spending right from Telegram.\n\n"
-        "<b>Commands</b>\n"
-        "💰 /summary — Monthly spending summary\n"
-        "🧾 /recent — Most recent transaction\n\n"
-        "Or just message me naturally, e.g. <i>\"spent 450 on lunch at Truffles\"</i> "
-        "or <i>\"how much did I spend at Zomato?\"</i>"
-    )
-    return _wrap("Welcome to Expense Tracker", body, emoji="👋")
-
-# Formatter for monthly summary
-def format_monthly_summary(summary, month: int | None = None, year: int | None = None) -> str:
-    title = "Monthly Summary"
-    if month:
-        title = f"Summary — {MONTH_NAMES[month]} {year}" if year else f"Summary — {MONTH_NAMES[month]}"
-
-    if not summary:
-        return _wrap(title, "No transactions found for that period. 🎉", emoji="📊")
-
-    body, total_income, total_expense = _format_grouped_rows(summary)
-    body += (
-        f"\n{DIVIDER}\n"
-        f"💵 <b>Total Income:</b> ₹{total_income:,.2f}\n"
-        f"💸 <b>Total Expense:</b> ₹{total_expense:,.2f}"
-    )
-    return _wrap(title, body, emoji="📊")
-
-
-def format_category_summary(category: str, summary) -> str:
-    title = f"Category: {category}"
-
-    if not summary:
-        return _wrap(title, f"No transactions found for <b>{category}</b>. 🤷", emoji="🏷️")
-
-    body, total_income, total_expense = _format_grouped_rows(summary)
-    body += (
-        f"\n{DIVIDER}\n"
-        f"💵 <b>Total Income:</b> ₹{total_income:,.2f}\n"
-        f"💸 <b>Total Expense:</b> ₹{total_expense:,.2f}"
-    )
-    return _wrap(title, body, emoji="🏷️")
-
-
-def format_merchant_summary(merchant: str, summary) -> str:
-    title = f"Merchant: {merchant}"
-
-    if not summary:
-        return _wrap(title, f"No transactions found for <b>{merchant}</b>. 🤷", emoji="🏪")
-
-    body, total_income, total_expense = _format_grouped_rows(summary)
-    body += (
-        f"\n{DIVIDER}\n"
-        f"💵 <b>Total Income:</b> ₹{total_income:,.2f}\n"
-        f"💸 <b>Total Expense:</b> ₹{total_expense:,.2f}"
-    )
-    return _wrap(title, body, emoji="🏪")
-
-
-def format_recent_transaction(transaction) -> str:
-    body = (
-        f"🏪 <b>Merchant:</b> {transaction.merchant}\n"
-        f"💵 <b>Amount:</b> ₹{transaction.amount}\n"
-        f"🏷️ <b>Category:</b> {transaction.category}\n"
-        f"🔄 <b>Type:</b> {transaction.transaction_type}\n"
-        f"📅 <b>Date:</b> {transaction.transaction_date}"
-    )
-    return _wrap("Latest Transaction", body, emoji="🧾")
-
-
-def format_transaction_added(transaction) -> str:
-    body = (
-        f"🏪 <b>Merchant:</b> {transaction.merchant}\n"
-        f"💵 <b>Amount:</b> ₹{transaction.amount}\n"
-        f"🏷️ <b>Category:</b> {transaction.category}\n"
-        f"🔄 <b>Type:</b> {transaction.transaction_type}"
-    )
-    return _wrap("Transaction Added", body, emoji="✅")
-
-
-def format_no_transactions() -> str:
-    return _wrap(
-        "No Transactions",
-        "We couldn't find any transactions yet. 🤷",
-        emoji="🧾",
-    )
-
-
-def format_unknown_command(command: str) -> str:
-    body = (
-        f"<code>{command}</code> isn't a command I recognize.\n\n"
-        "Try /start to see what's available."
-    )
-    return _wrap("Unknown Command", body, emoji="❓")
-
-
-def format_could_not_understand() -> str:
-    body = (
-        "I couldn't figure out what you meant. Try something like:\n\n"
-        "• <i>\"spent 200 on coffee\"</i>\n"
-        "• <i>\"how much did I spend on groceries?\"</i>\n"
-        "• <i>\"show me my Swiggy spending\"</i>\n\n"
-        "Or use /start to see the available commands."
-    )
-    return _wrap("Didn't Quite Catch That", body, emoji="🤔")
-
-
-def format_error() -> str:
-    return _wrap(
-        "Something Went Wrong",
-        "There was a problem processing that request. Please try again.",
-        emoji="⚠️",
-    )
 
 
 # ----------------------------------------------------------------------
@@ -185,7 +43,7 @@ async def handle_command(command: str, db: Session) -> str:
 
     if command == "/summary":
         try:
-            summary = await summarize_transactions_for_last_month(db)
+            summary = await summarize_all_transactions(db)
         except Exception:
             logger.exception("Failed to summarize transactions")
             return format_error()
@@ -222,6 +80,9 @@ async def handle_text(text: str, db: Session) -> str:
     logger.debug("Parsed intent: %s", intent)
 
     try:
+        if intent.intent == "needs_clarification":
+            return format_needs_clarification(intent.clarification_message)
+
         if intent.intent == "monthly_summary":
             print(f"Fetching monthly summary for month={intent.month}, year={intent.year}")
             summary = await get_monthly_summary(db=db, month=intent.month, year=intent.year)
@@ -238,11 +99,11 @@ async def handle_text(text: str, db: Session) -> str:
             return format_merchant_summary(intent.merchant, summary)
 
         if intent.intent == "recent_transactions":
-            print("Fetching most recent transaction")
-            transaction = await get_latest_transaction(db)
+            print("Fetching most recent transaction", intent.model_dump())
+            transaction = await get_recent_transactions(db, limit=intent.limit)
             if not transaction:
                 return format_no_transactions()
-            return format_recent_transaction(transaction)
+            return format_recent_transactions(transaction)
 
         if intent.intent == "transaction_type_summary":
             print(f"Fetching transaction type summary for type={intent.transaction_type}")

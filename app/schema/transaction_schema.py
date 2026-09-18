@@ -46,3 +46,4 @@ class TelegramIntent(BaseModel):
     limit: int | None = 5
     transaction_type: str | None = None
     transaction_date: datetime | None = None
+    clarification_message: str | None

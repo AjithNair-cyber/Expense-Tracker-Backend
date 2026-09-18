@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.services.telegram_services import handle_command, send_message, handle_text
-
+from app.config.config import settings
 # Create a router for Telegram-related endpoints
 telegram_router = APIRouter(
     prefix="/telegram",
@@ -20,7 +20,10 @@ async def telegram_webhook(
 ):
     # Get the update from the request body
     update = await request.json()
-
+    user = update.get('message', {}).get('from', {}).get('id', 'unknown')
+    print(f"Received update from user {user}: user != settings.USER_ID: {user } : {settings.USER_ID} {user != settings.USER_ID}")
+    if user != settings.USER_ID:
+        return {"status": "ignored", "message": "Unauthorized user"}
     # Check if the update contains a message
     message = update.get("message")
 

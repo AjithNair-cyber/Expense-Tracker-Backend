@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     TELEGRAM_BOT_TOKEN: str
     OPENAI_MODEL: str
+    USER_ID: int
 
     class Config:
         env_file = ".env"

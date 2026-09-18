@@ -1,11 +1,9 @@
 from datetime import date, timedelta
-
 from sqlalchemy import func, text
-
 from  app.models.transactions import Transaction
 from sqlalchemy.orm import Session
 
-
+# Function to get the latest transaction from the database
 async def get_latest_transaction(db: Session):
     return (
         db.query(Transaction)
@@ -16,7 +14,7 @@ async def get_latest_transaction(db: Session):
         .first()
     )
 
-
+# Function to summarize transactions for the last month by category and type
 async def summarize_transactions_for_last_month(db: Session):
     """
     Summarize transactions by category and type for the previous calendar month.
@@ -45,6 +43,7 @@ async def summarize_transactions_for_last_month(db: Session):
  
     return summary
 
+# Function to summarize all the transactions ever
 async def summarize_all_transactions(db: Session):
     """
     Summarize transactions by category and type for all time.
@@ -64,10 +63,11 @@ async def summarize_all_transactions(db: Session):
  
     return summary
 
+# Function to summarize transactions for a specific month and year
 async def get_monthly_summary(db: Session, month: int | None = None, year: int | None = None):
     """
     Summarize transactions by category and type for a specific month and year.
-    If month or year is not provided, defaults to the previous calendar month.
+    If month or year is not provided, defaults to the current calendar month.
  
     Returns a list of rows: (category, transaction_type, total_amount).
     """
@@ -75,10 +75,10 @@ async def get_monthly_summary(db: Session, month: int | None = None, year: int |
  
     if month is None or year is None:
         first_of_this_month = today.replace(day=1)
-        last_day_of_previous_month = first_of_this_month - timedelta(days=1)
-        first_day_of_previous_month = last_day_of_previous_month.replace(day=1)
-        month = first_day_of_previous_month.month
-        year = first_day_of_previous_month.year
+        last_day_of_this_month = first_of_this_month.replace(day=1) + timedelta(days=32)
+        last_day_of_this_month = last_day_of_this_month.replace(day=1) - timedelta(days=1)
+        month = first_of_this_month.month
+        year = first_of_this_month.year
  
     summary = (
         db.query(
@@ -97,6 +97,7 @@ async def get_monthly_summary(db: Session, month: int | None = None, year: int |
  
     return summary
 
+# Function to summarize transactions for a specific category
 async def get_category_summary(db: Session, category: str):
     """
     Summarize transactions by type for a specific category.
@@ -117,6 +118,7 @@ async def get_category_summary(db: Session, category: str):
  
     return summary
 
+# Function to summarize transactions for a specific transaction type
 async def get_transaction_type_summary(db: Session, transaction_type: str):
     """
     Summarize transactions by category for a specific transaction type.
@@ -137,6 +139,7 @@ async def get_transaction_type_summary(db: Session, transaction_type: str):
  
     return summary
 
+# Function to summarize transactions for a specific merchant
 async def get_merchant_summary(db: Session, merchant: str):
     """
     Summarize transactions by type for a specific merchant.
@@ -157,6 +160,7 @@ async def get_merchant_summary(db: Session, merchant: str):
  
     return summary
 
+# Function to get recent transactions, limited to a specified number
 async def get_recent_transactions(db: Session, limit: int = 5):
     """
     Get the most recent transactions, limited to a specified number.
@@ -175,6 +179,7 @@ async def get_recent_transactions(db: Session, limit: int = 5):
  
     return recent_transactions
 
+# Function to add a new transaction to the database
 async def add_transaction(db: Session, amount: float, merchant: str | None = None, category: str | None = None):
     """
     Add a new transaction to the database.

@@ -116,9 +116,16 @@ Important:
 
 
 # Function to parse a Telegram message and determine the user's intent
-async def parse_telegram_message(message: str):
+async def parse_telegram_message(message: str) -> TelegramIntent:
     """
     Parse a Telegram message to determine the user's intent and extract relevant information.
+
+    If the message clearly maps to a supported intent but is missing information
+    that intent actually requires (e.g. "add_transaction" with no amount), the
+    model returns intent="needs_clarification" with a `clarification_message`
+    asking the user to resend the message with the missing detail — rather than
+    guessing a value or silently leaving a required field null.
+
     Returns a TelegramIntent object with the extracted information.
     """
     response = client.responses.parse(
@@ -139,27 +146,59 @@ Possible intents:
 - recent_transactions
 - add_transaction
 - transaction_type_summary
+- needs_clarification
 - unknown
 
 Extract any relevant information from the message.
 
 For category_summary:
 - Extract the requested expense category.
+- The category is required. If none is mentioned, set intent to
+  "needs_clarification" and ask which category they mean.
 
 For merchant_summary:
 - Extract the merchant name.
+- The merchant is required. If none is mentioned, set intent to
+  "needs_clarification" and ask which merchant they mean.
 
 For transaction_type_summary:
-- Extract the transaction type. Return "expense" or "income" when possible. Return null when not specified.
+- Extract the transaction type. Return "expense" or "income" when possible.
+- This field is optional — return null when not specified. Do not ask for
+  clarification just because it's missing.
 
 For add_transaction:
-- Extract the amount, merchant, transaction_type, transaction_date and category when available. Return OTHER for category when it cannot be determined.
+- Extract the amount, merchant, transaction_type, transaction_date and
+  category when available. Return "OTHER" for category when it cannot be
+  determined.
+- The amount is required. If it is missing, unclear, or not a number, set
+  intent to "needs_clarification" and ask the user to resend the message
+  with the amount included.
+- Merchant, transaction_type, transaction_date, and category may be
+  inferred or defaulted, so a missing one of these alone is not a reason
+  for clarification.
 
 For monthly_summary:
 - Extract the requested month and year when explicitly provided.
+- Both are optional (defaults to the most recent month if omitted), so do
+  not ask for clarification if they're missing.
 
-Do not invent values.
-Return null when information is not available.
+For recent_transactions:
+- Extract the limit of recent transactions to return when explicitly
+  provided. Return 5 when not specified.
+
+General rules:
+- If the message doesn't reference expenses, income, or the tracker at all
+  (e.g. a greeting or unrelated chit-chat), set intent to "unknown".
+- If the message clearly maps to one of the intents above but is missing a
+  REQUIRED piece of information for that intent (see the per-intent rules),
+  set intent to "needs_clarification" instead of guessing or leaving a
+  required field null.
+- When intent is "needs_clarification", populate `clarification_message`
+  with a short, friendly question — in the same language the user wrote
+  in — asking them to resend the message with the missing detail included.
+  For every other intent, leave `clarification_message` null.
+- Never invent or assume a value you were not given. Return null for any
+  field that isn't mentioned and isn't required for the detected intent.
 """
             },
             {
@@ -168,6 +207,6 @@ Return null when information is not available.
             }
         ],
         text_format=TelegramIntent,
-    ) 
+    )
 
     return response.output_parsed
