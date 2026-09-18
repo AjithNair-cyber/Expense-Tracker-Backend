@@ -21,6 +21,7 @@ async def ingest_transaction(request: Request, db: Session = Depends(get_db)):
     body = await request.body()
 
     message = body.decode("utf-8")
+
     print(f"Received message: {message}")
     # Validate if the message is a valid transaction
     if not await is_valid_transaction_message(message):
@@ -41,7 +42,8 @@ async def ingest_transaction(request: Request, db: Session = Depends(get_db)):
     transaction_date=parsed.transaction_date,
     source="sms",
     raw_message=message,
-)
+)   
+    print(f"Parsed transaction: {new_transaction.model_dump()}")
 
     # Save the new transaction to the database
     db_transaction = Transaction(**new_transaction.model_dump())

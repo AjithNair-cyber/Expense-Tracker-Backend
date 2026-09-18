@@ -29,6 +29,7 @@ class TransactionCreate(BaseModel):
     category: CategoryType | None = None
     transaction_type: str
     transaction_date: datetime
+    raw_message: str | None = None
     source: str
 
 # Define a Pydantic model for the response after creating a transaction
