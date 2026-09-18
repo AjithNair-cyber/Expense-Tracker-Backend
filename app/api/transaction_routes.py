@@ -13,6 +13,9 @@ transaction_router = APIRouter(
     tags=["Transactions"],
 )
 
+@transaction_router.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 # Define a POST endpoint for ingesting transaction messages
 # This endpoint will receive a bank SMS message, validate it, and parse it into a transaction
