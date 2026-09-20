@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str
     OPENAI_MODEL: str
     USER_ID: int
+    AUTH_TOKEN: str
 
     class Config:
         env_file = ".env"

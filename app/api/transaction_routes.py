@@ -6,6 +6,8 @@ from app.models.transactions import Transaction
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.schema.transaction_schema import TransactionCreate
+from app.config.config import settings
+from app.services.telegram_services import send_message
 
 # Create a router for transaction-related endpoints
 transaction_router = APIRouter(
@@ -22,10 +24,13 @@ async def health_check():
 @transaction_router.post("/ingest")
 async def ingest_transaction(request: Request, db: Session = Depends(get_db)):
     body = await request.body()
+    header = request.headers.get('authentication' or None)
+
+    # if (header is None) or (header != settings.AUTH_TOKEN):
+    #     return {"status": "unauthorized", "message": "Invalid authentication header"}
 
     message = body.decode("utf-8")
 
-    print(f"Received message: {message}")
     # Validate if the message is a valid transaction
     if not await is_valid_transaction_message(message):
         print(f"Invalid transaction message: {message}")
@@ -45,6 +50,9 @@ async def ingest_transaction(request: Request, db: Session = Depends(get_db)):
     transaction_date=parsed.transaction_date,
     source="sms",
     raw_message=message,
+    transaction_mode=parsed.transaction_mode,
+    bank_name=parsed.bank_name,
+    card_name=parsed.card_name
 )   
     print(f"Parsed transaction: {new_transaction.model_dump()}")
 
@@ -55,8 +63,12 @@ async def ingest_transaction(request: Request, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_transaction)
 
+    await send_message(
+        chat_id=settings.USER_ID,
+        text=f"New transaction received: {new_transaction.amount} {new_transaction.currency} at {new_transaction.merchant or 'Unknown Merchant'} on {new_transaction.transaction_date.strftime('%Y-%m-%d %H:%M:%S') } for merchant {new_transaction.merchant or 'Unknown Merchant'} in category {new_transaction.category or 'Uncategorized'} via {new_transaction.transaction_mode or 'Unknown Mode'} via {new_transaction.source or 'Unknown Source'}",
+    )
+
     return {
         "status": "received",
         "message": message,
-        "parsed": parsed
     }

@@ -56,3 +56,15 @@ class Transaction(Base):
         default=datetime.utcnow,
         nullable=False,
     )
+
+    # To store whether is transaction is made from Credit card, Debit card, UPI, Netbanking, Cash, etc.
+    transaction_mode: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    # To store the bank name from which the transaction is made
+    bank_name: Mapped[str] = mapped_column(String(50), nullable=True)
+
+    # To store the card name from which the transaction is made
+    card_name: Mapped[str] = mapped_column(String(50), nullable=True)

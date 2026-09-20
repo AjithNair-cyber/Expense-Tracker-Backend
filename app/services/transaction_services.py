@@ -1,5 +1,6 @@
-from datetime import date, timedelta
-from sqlalchemy import func, text
+from datetime import date, timedelta, datetime
+from decimal import Decimal
+from sqlalchemy import func, text, extract
 from  app.models.transactions import Transaction
 from sqlalchemy.orm import Session
 
@@ -179,6 +180,7 @@ async def get_recent_transactions(db: Session, limit: int = 5):
  
     return recent_transactions
 
+
 # Function to add a new transaction to the database
 async def add_transaction(db: Session, amount: float, merchant: str | None = None, category: str | None = None):
     """
@@ -202,3 +204,219 @@ async def add_transaction(db: Session, amount: float, merchant: str | None = Non
     db.refresh(new_transaction)
  
     return new_transaction
+
+async def get_transaction_by_id(
+    db: Session,
+    transaction_id: int,
+):
+    return (
+        db.query(Transaction)
+        .filter(Transaction.id == transaction_id)
+        .first()
+    )
+
+async def get_recent_transactions(
+    db: Session,
+    limit: int = 5,
+):
+    return (
+        db.query(Transaction)
+        .order_by(
+            Transaction.transaction_date.desc(),
+            Transaction.id.desc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+async def get_transactions_between_dates(
+    db: Session,
+    start_date: datetime,
+    end_date: datetime,
+):
+    return (
+        db.query(Transaction)
+        .filter(
+            Transaction.transaction_date >= start_date,
+            Transaction.transaction_date <= end_date,
+        )
+        .order_by(
+            Transaction.transaction_date.desc(),
+            Transaction.id.desc(),
+        )
+        .all()
+    )
+
+async def get_transactions_between_dates(
+    db: Session,
+    start_date: datetime,
+    end_date: datetime,
+):
+    return (
+        db.query(Transaction)
+        .filter(
+            Transaction.transaction_date >= start_date,
+            Transaction.transaction_date <= end_date,
+        )
+        .order_by(
+            Transaction.transaction_date.desc(),
+            Transaction.id.desc(),
+        )
+        .all()
+    )
+
+async def get_transactions_by_category(
+    db: Session,
+    category: str,
+):
+    return (
+        db.query(Transaction)
+        .filter(Transaction.category == category)
+        .order_by(
+            Transaction.transaction_date.desc(),
+            Transaction.id.desc(),
+        )
+        .all()
+    )
+
+
+
+async def get_transactions_by_merchant(
+    db: Session,
+    merchant: str,
+):
+    return (
+        db.query(Transaction)
+        .filter(Transaction.merchant.ilike(f"%{merchant}%"))
+        .order_by(
+            Transaction.transaction_date.desc(),
+            Transaction.id.desc(),
+        )
+        .all()
+    )
+
+async def get_transactions_by_type(
+    db: Session,
+    transaction_type: str,
+):
+    return (
+        db.query(Transaction)
+        .filter(Transaction.transaction_type == transaction_type)
+        .order_by(
+            Transaction.transaction_date.desc(),
+            Transaction.id.desc(),
+        )
+        .all()
+    )
+
+async def get_daily_summary(
+    db: Session,
+    date: datetime,
+):
+    transactions = (
+        db.query(Transaction)
+        .filter(
+            Transaction.transaction_date >= date.replace(
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
+            ),
+            Transaction.transaction_date < (
+                date.replace(
+                    hour=0,
+                    minute=0,
+                    second=0,
+                    microsecond=0,
+                ) + timedelta(days=1)
+            ),
+        )
+        .all()
+    )
+
+    total_expense = sum(
+        transaction.amount
+        for transaction in transactions
+        if transaction.transaction_type == "expense"
+    )
+
+    total_income = sum(
+        transaction.amount
+        for transaction in transactions
+        if transaction.transaction_type == "income"
+    )
+
+    return {
+        "total_expense": total_expense,
+        "total_income": total_income,
+        "balance": total_income - total_expense,
+        "transaction_count": len(transactions),
+    }
+
+async def get_yearly_summary(
+    db: Session,
+    year: int,
+):
+    transactions = (
+        db.query(Transaction)
+        .filter(
+            extract("year", Transaction.transaction_date) == year
+        )
+        .all()
+    )
+
+    total_expense = sum(
+        transaction.amount
+        for transaction in transactions
+        if transaction.transaction_type == "expense"
+    )
+
+    total_income = sum(
+        transaction.amount
+        for transaction in transactions
+        if transaction.transaction_type == "income"
+    )
+
+    return {
+        "year": year,
+        "total_expense": total_expense,
+        "total_income": total_income,
+        "balance": total_income - total_expense,
+        "transaction_count": len(transactions),
+    }
+
+async def get_largest_transactions(
+    db: Session,
+    limit: int = 5,
+):
+    return (
+        db.query(Transaction)
+        .filter(Transaction.transaction_type == "expense")
+        .order_by(
+            Transaction.amount.desc(),
+            Transaction.transaction_date.desc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+async def find_duplicate_transactions(
+    db: Session,
+    amount: Decimal,
+    merchant: str | None,
+    transaction_date: datetime,
+):
+    query = (
+        db.query(Transaction)
+        .filter(
+            Transaction.amount == amount,
+            Transaction.transaction_date == transaction_date,
+        )
+    )
+
+    if merchant:
+        query = query.filter(
+            Transaction.merchant.ilike(merchant)
+        )
+
+    return query.all()
