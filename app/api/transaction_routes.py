@@ -26,8 +26,8 @@ async def ingest_transaction(request: Request, db: Session = Depends(get_db)):
     body = await request.body()
     header = request.headers.get('authentication' or None)
 
-    # if (header is None) or (header != settings.AUTH_TOKEN):
-    #     return {"status": "unauthorized", "message": "Invalid authentication header"}
+    if (header is None) or (header != settings.AUTH_TOKEN):
+        return {"status": "unauthorized", "message": "Invalid authentication header"}
 
     message = body.decode("utf-8")
 
